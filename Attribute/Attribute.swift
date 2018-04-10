@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct Pod {
+struct Pod: Encodable {
     let name: String
     let version: String
     let license: String
@@ -20,7 +20,7 @@ class Attribute {
     func generate() {
         let podfileLock = readPodfileLock()
         let pods = parsePods(from: podfileLock)
-        print(pods)
+        writePodsJson(pods)
     }
 
     private func readPodfileLock() -> String {
@@ -32,7 +32,7 @@ class Attribute {
         do {
             podfileLock = try String(contentsOfFile: podfileLockPath)
         } catch {
-            print(error)
+            printError("Unable to read Podfile.lock contents")
             exit(EXIT_FAILURE)
         }
 
@@ -46,7 +46,9 @@ class Attribute {
             let components = line.components(separatedBy: " ")
             guard components.count > 4 else { return nil }
             let name = components[3]
-            let version = components[4].replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: "")
+            let version = components[4].replacingOccurrences(of: "(", with: "")
+                .replacingOccurrences(of: ")", with: "")
+                .replacingOccurrences(of: ":", with: "")
             return (name, version)
         }
 
@@ -73,6 +75,30 @@ class Attribute {
         }
 
         return pods
+
+    }
+
+    private func writePodsJson(_ pods: [Pod]) {
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .prettyPrinted
+
+        let data: Data
+
+        do {
+             data = try encoder.encode(pods)
+        } catch {
+            printError("Error encoding pods to JSON")
+            exit(EXIT_FAILURE)
+        }
+
+        let outputPath = path + "/attributions.json"
+
+        if FileManager.default.fileExists(atPath: outputPath) {
+            try! FileManager.default.removeItem(atPath: outputPath)
+        }
+
+        FileManager.default.createFile(atPath: outputPath, contents: data, attributes: [:])
 
     }
 
